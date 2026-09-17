@@ -1,6 +1,7 @@
 import type { TicketDateValue, TicketRecord } from '../types/ticket'
 
-const API_BASE = (import.meta.env.VITE_CORTEZA_API_URL || 'http://localhost:18080/api').replace(/\/$/, '')
+const API_BASE = (import.meta.env.VITE_CORTEZA_API_URL || 'http://localhost:18080').replace(/\/$/, '')
+const MODULE_ID = (import.meta.env.VITE_CORTEZA_MODULE_ID || '')
 
 export interface CortezaListResponse {
   data: TicketRecord[]
@@ -27,21 +28,26 @@ function getHeaders() {
 }
 
 function toTicketRecord(input: any): TicketRecord {
+  // Normalize different possible shapes returned by Corteza
+  const payload = input?.record || input?.data || input || {}
+  const values = payload?.values || payload
+
   return {
-    id: input?.recordID || input?.id || input?.record_id,
-    subject: input?.subject || '',
-    description: input?.description || '',
-    status: input?.status || 'New',
-    priority: input?.priority || 'Medium',
-    dueDate: input?.dueDate || input?.due_date || null,
-    createdAt: input?.createdAt || input?.created_at,
-    updatedAt: input?.updatedAt || input?.updated_at,
-    owner: input?.owner || input?.createdBy || input?.ownerID
+    id: payload?.recordID || payload?.id || payload?.record_id || values?.ID || values?.id,
+    subject: values?.subject || payload?.subject || '',
+    description: values?.description || payload?.description || '',
+    status: values?.status || payload?.status || 'New',
+    priority: values?.priority || payload?.priority || 'Medium',
+    dueDate: values?.dueDate || values?.due_date || payload?.dueDate || payload?.due_date || null,
+    createdAt: payload?.createdAt || payload?.created_at || values?.createdAt,
+    updatedAt: payload?.updatedAt || payload?.updated_at || values?.updatedAt,
+    owner: payload?.owner || values?.owner || payload?.createdBy
   }
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const url = path.startsWith('http') ? path : `${API_BASE}${path}`
+  const response = await fetch(url, {
     credentials: 'include',
     headers: getHeaders(),
     ...init
@@ -56,45 +62,117 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return text ? (JSON.parse(text) as T) : ({} as T)
 }
 
+async function tryEndpointsForList(candidates: string[]) {
+  let lastErr: any = null
+  for (const p of candidates) {
+    try {
+      const res = await request<any>(p)
+      if (Array.isArray(res) || res?.data) return res
+    } catch (err) {
+      lastErr = err
+    }
+  }
+  throw lastErr || new Error('No working list endpoint found')
+}
+
 export const cortezaService = {
   async listTickets(): Promise<TicketRecord[]> {
-    const payload = await request<any>(`/module/records?module=Support Ticket`)
-    const rows = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : []
+    if (!MODULE_ID) throw new Error('VITE_CORTEZA_MODULE_ID is not set')
+
+    const candidates = [
+      `/api/records?module=${MODULE_ID}`,
+      `/api/compose/records?module=${MODULE_ID}`,
+      `/api/module/records?module=${MODULE_ID}`,
+      `/api/records?moduleName=${encodeURIComponent('Support Ticket')}`
+    ]
+
+    const payload = await tryEndpointsForList(candidates)
+    const rows = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : payload?.data || []
     return rows.map(toTicketRecord)
   },
 
   async createTicket(payload: Partial<TicketRecord>): Promise<TicketRecord> {
+    if (!MODULE_ID) throw new Error('VITE_CORTEZA_MODULE_ID is not set')
     const normalizedPayload = {
-      ...payload,
-      dueDate: normalizeDueDate(payload.dueDate ?? null)
+      record: {
+        moduleID: MODULE_ID,
+        values: {
+          subject: payload.subject,
+          description: payload.description,
+          status: payload.status,
+          priority: payload.priority,
+          dueDate: normalizeDueDate(payload.dueDate ?? null)
+        }
+      }
     }
 
-    const response = await request<any>('/records', {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify(normalizedPayload)
-    })
-    return toTicketRecord(response?.record || response)
+    const candidates = [
+      `/api/records`,
+      `/api/compose/records`,
+      `/api/records?module=${MODULE_ID}`
+    ]
+
+    let lastErr: any = null
+    for (const p of candidates) {
+      try {
+        const resp = await request<any>(p, {
+          method: 'POST',
+          body: JSON.stringify(normalizedPayload)
+        })
+        return toTicketRecord(resp?.record || resp)
+      } catch (err) {
+        lastErr = err
+      }
+    }
+    throw lastErr || new Error('Create failed for all candidate endpoints')
   },
 
   async updateTicket(id: string, payload: Partial<TicketRecord>): Promise<TicketRecord> {
     const normalizedPayload = {
-      ...payload,
-      dueDate: normalizeDueDate(payload.dueDate ?? null)
+      record: {
+        moduleID: MODULE_ID,
+        recordID: id,
+        values: {
+          subject: payload.subject,
+          description: payload.description,
+          status: payload.status,
+          priority: payload.priority,
+          dueDate: normalizeDueDate(payload.dueDate ?? null)
+        }
+      }
     }
 
-    const response = await request<any>(`/records/${id}`, {
-      method: 'PATCH',
-      headers: getHeaders(),
-      body: JSON.stringify(normalizedPayload)
-    })
-    return toTicketRecord(response?.record || response)
+    const candidates = [
+      `/api/records/${id}`,
+      `/api/compose/records/${id}`
+    ]
+
+    let lastErr: any = null
+    for (const p of candidates) {
+      try {
+        const resp = await request<any>(p, {
+          method: 'PATCH',
+          body: JSON.stringify(normalizedPayload)
+        })
+        return toTicketRecord(resp?.record || resp)
+      } catch (err) {
+        lastErr = err
+      }
+    }
+    throw lastErr || new Error('Update failed for all candidate endpoints')
   },
 
   async deleteTicket(id: string): Promise<void> {
-    await request<any>(`/records/${id}`, {
-      method: 'DELETE',
-      headers: getHeaders()
-    })
+    const candidates = [`/api/records/${id}`, `/api/compose/records/${id}`]
+    let lastErr: any = null
+    for (const p of candidates) {
+      try {
+        await request<any>(p, { method: 'DELETE' })
+        return
+      } catch (err) {
+        lastErr = err
+      }
+    }
+    throw lastErr || new Error('Delete failed for all candidate endpoints')
   }
 }
