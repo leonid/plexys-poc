@@ -1,0 +1,43 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: plexys-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: corteza
+      POSTGRES_USER: corteza
+      POSTGRES_PASSWORD: corteza
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  corteza:
+    image: cortezaproject/corteza:2026.9.0-dev.1
+    container_name: plexys-corteza
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - "18080:80"
+    environment:
+      CORTEZA_DB_HOST: postgres
+      CORTEZA_DB_PORT: 5432
+      CORTEZA_DB_NAME: corteza
+      CORTEZA_DB_USER: corteza
+      CORTEZA_DB_PASSWORD: corteza
+      CORTEZA_HTTP_ADDR: 0.0.0.0:80
+    volumes:
+      - corteza_data:/var/lib/corteza
+      # Local override for webapp config to ensure correct public URL and auth endpoints
+      - ./corteza-config/config.js:/corteza/webapp/config.js:ro
+
+volumes:
+  postgres_data:
+  corteza_data:
+
+# NOTE:
+# This is the baseline working template. After the first real Corteza setup, pin the exact
+# image tag and environment variables to the verified working version.
