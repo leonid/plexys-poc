@@ -1,0 +1,52 @@
+{
+  "compose": {
+    "version": "1.0",
+    "namespaces": [
+      {
+        "name": "Plexys Homework",
+        "handle": "plexys-homework",
+        "modules": [
+          {
+            "name": "Support Ticket",
+            "handle": "support_ticket",
+            "fields": [
+              {
+                "name": "subject",
+                "kind": "String",
+                "label": "Subject",
+                "required": true
+              },
+              {
+                "name": "description",
+                "kind": "Text",
+                "label": "Description",
+                "required": false
+              },
+              {
+                "name": "status",
+                "kind": "Select",
+                "label": "Status",
+                "required": true,
+                "options": ["New", "In Progress", "Resolved", "Closed"]
+              },
+              {
+                "name": "priority",
+                "kind": "Select",
+                "label": "Priority",
+                "required": true,
+                "options": ["Low", "Medium", "High", "Urgent"]
+              },
+              {
+                "name": "dueDate",
+                "kind": "DateTime",
+                "label": "Due Date",
+                "required": false
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "note": "This is a best-effort Corteza Compose import file. Import via Corteza Compose UI or adjust format per your Corteza version if needed. If import fails, create namespace/module manually using the Compose UI per docs/plan.md."
+}
