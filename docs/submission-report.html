@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plexys Homework — Support Ticket Manager POC Report</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --surface: #ffffff;
+      --bg: #f8fafc;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.45;
+      font-size: 13px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .report-container {
+      max-width: 860px;
+      margin: 0 auto;
+      background: #fff;
+    }
+
+    /* Page layout */
+    .page {
+      padding: 34px 40px 28px;
+      min-height: 1060px;
+      position: relative;
+      background: #ffffff;
+      page-break-after: always;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .page:last-child {
+      page-break-after: avoid;
+    }
+
+    .page-footer {
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+
+    /* Typography */
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+
+    h2 {
+      font-size: 15.5px;
+      font-weight: 700;
+      color: #1e293b;
+      border-bottom: 2px solid #f1f5f9;
+      padding-bottom: 4px;
+      margin: 12px 0 8px;
+    }
+
+    h3 {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #334155;
+      margin: 10px 0 4px;
+    }
+
+    p {
+      margin-bottom: 6px;
+      color: #334155;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 10px;
+      font-size: 12px;
+    }
+
+    th, td {
+      padding: 6px 9px;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+
+    th {
+      background: #f8fafc;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    /* Code & Architecture blocks */
+    pre, code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      overflow-x: auto;
+      margin: 8px 0 10px;
+      line-height: 1.35;
+    }
+
+    .card {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      margin: 8px 0;
+    }
+
+    /* Image figures */
+    .figure-box {
+      margin: 8px 0 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: #ffffff;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+    }
+
+    .figure-box img {
+      width: 100%;
+      display: block;
+      max-height: 220px;
+      object-fit: contain;
+      background: #fafafa;
+    }
+
+    .figure-caption {
+      padding: 5px 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: #f8fafc;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .two-img-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 8px 0;
+    }
+
+    .two-img-grid .figure-box img {
+      max-height: 155px;
+    }
+
+    /* Print styling */
+    @media print {
+      body {
+        background: #fff;
+      }
+      .page {
+        padding: 24px 28px 18px;
+        min-height: auto;
+        page-break-after: always;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+
+    .print-bar {
+      position: sticky;
+      top: 0;
+      background: #1e293b;
+      color: #fff;
+      padding: 10px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .btn:hover {
+      background: #1d4ed8;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="print-bar no-print">
+    <span>📄 <strong>Plexys Homework Submission Report (5 Pages Complete with Proofs)</strong></span>
+    <button class="btn" onclick="window.print()">Print / Save as PDF (Cmd + P)</button>
+  </div>
+
+  <div class="report-container">
+
+    <!-- PAGE 1: OVERVIEW & SYSTEM DASHBOARD -->
+    <section class="page">
+      <h1>Support Ticket Manager — Technical POC</h1>
+      <div class="subtitle">Plexys Enterprise Evaluation · Custom Vue 3 Frontend on Corteza Low-Code Backend</div>
+
+      <div class="card">
+        <strong>Project Goal:</strong> Build a production-pattern Proof of Concept demonstrating a custom Vue 3 Single Page Application integrated against a Corteza backend with strict user identity preservation, clean architecture, failure path handling, and cross-module data relations.
+      </div>
+
+      <h2>1. Custom Application Interface (Vue 3 Dashboard)</h2>
+      <div class="figure-box">
+        <img src="images/app-table-dashboard.png" alt="Vue 3 Support Tickets Dashboard" />
+        <div class="figure-caption">
+          <span>Figure 1: Custom Vue 3 Table with Customer Badges, Real-time Metrics & User Session Indicator</span>
+          <span>Vue 3 / PrimeVue</span>
+        </div>
+      </div>
+
+      <h2>2. High-Level Architecture</h2>
+      <pre>
+┌─────────────────────────────────────────────────────────────┐
+│                    Vue 3 SPA (PrimeVue)                     │
+│  ┌──────────────────┐  ┌────────────────┐  ┌─────────────┐  │
+│  │ TicketTable.vue  │  │ TicketModal.vue│  │   App.vue   │  │
+│  └────────┬─────────┘  └───────┬────────┘  └──────┬──────┘  │
+│           └────────────────────┼──────────────────┘         │
+│                                ↓                            │
+│                  useTickets / useCustomers                 │
+│                                ↓                            │
+│                      cortezaService (API)                   │
+└────────────────────────────────┬────────────────────────────┘
+                                 │ HTTP Bearer JWT (OAuth2)
+                                 ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Corteza Low-Code Backend                    │
+│  - Namespace: "Plexys Homework"                             │
+│  - Modules: "Support Ticket", "Customers" (Record Relation) │
+│  - RBAC & Audit Engine (Preserving Signed-in User Identity) │
+└────────────────────────────────┬────────────────────────────┘
+                                 │
+                                 ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     PostgreSQL 15                           │
+└─────────────────────────────────────────────────────────────┘</pre>
+
+      <div class="page-footer">
+        <span>Plexys Homework POC</span>
+        <span>Page 1 of 5</span>
+      </div>
+    </section>
+
+    <!-- PAGE 2: ARCHITECTURE & DATA MODELING -->
+    <section class="page">
+      <h2>3. Technology Choices & Data Modeling</h2>
+
+      <h3>Why Vue 3 + Composition API?</h3>
+      <p>
+        Vue 3's Composition API provides clean architectural boundaries between UI rendering and business logic. State management is isolated in composables (<code>useTickets</code>, <code>useCustomers</code>), while components (<code>TicketTable.vue</code>, <code>TicketModal.vue</code>) remain pure, declarative, and testable.
+      </p>
+
+      <h3>Why PrimeVue + Aura Theme?</h3>
+      <p>
+        PrimeVue delivers accessible, responsive data components (<code>DataTable</code>, <code>Dialog</code>, <code>Calendar</code>, <code>Select</code>, <code>ConfirmDialog</code>) with native keyboard navigation, eliminating the need to write an unvetted UI library from scratch.
+      </p>
+
+      <h3>Data Modeling & Cross-Module Relation (Customer Bonus)</h3>
+      <p>
+        The <strong>Support Ticket</strong> module references the <strong>Customers</strong> module using a <code>Record selector</code> field. The frontend loads customer records dynamically and resolves foreign keys to names and company badges, supporting complete creation and update workflows.
+      </p>
+
+      <div class="two-img-grid">
+        <div class="figure-box">
+          <img src="images/corteza-customer-module-fields.png" alt="Customer Module Fields" />
+          <div class="figure-caption">
+            <span>Figure 2: Customers Module Schema</span>
+            <span>Corteza Compose</span>
+          </div>
+        </div>
+        <div class="figure-box">
+          <img src="images/corteza-support-ticket-fields.png" alt="Support Ticket Fields" />
+          <div class="figure-caption">
+            <span>Figure 3: Support Ticket Schema & Record Relation</span>
+            <span>Corteza Compose</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-footer">
+        <span>Plexys Homework POC</span>
+        <span>Page 2 of 5</span>
+      </div>
+    </section>
+
+    <!-- PAGE 3: FAILURE PATH TRACING & AUDIT -->
+    <section class="page">
+      <h2>4. Technical Decisions & Failure Path Tracing</h2>
+
+      <div class="card">
+        <strong>Review Focus:</strong> Distinguishing observed platform behavior from initial assumptions, and tracing how the system handles error states.
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 20%;">Step / Action</th>
+            <th style="width: 40%;">Observed vs. Assumed Behavior</th>
+            <th style="width: 40%;">UI Reaction & Recovery</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>API Authentication</strong></td>
+            <td>
+              <strong>Assumed:</strong> Session cookies alone would authenticate REST calls via <code>credentials: 'include'</code>.<br>
+              <strong>Observed:</strong> Corteza REST API strictly requires an <code>Authorization: Bearer &lt;JWT&gt;</code> header.
+            </td>
+            <td>
+              Shows actionable error banner with a direct <em>"Provide Auth Token"</em> modal button to connect dynamically.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Create Ticket</strong></td>
+            <td>
+              <strong>Observed:</strong> Client-side validation halts dispatch when mandatory <code>subject</code> is omitted.
+            </td>
+            <td>
+              Subject field highlights in red with <em>"Subject is required"</em>; modal remains open for correction.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Update Ticket</strong></td>
+            <td>
+              <strong>Observed:</strong> API accepts targeted <code>PATCH /record/{id}</code> payloads.
+            </td>
+            <td>
+              Refreshes table on HTTP 200; keeps form open and displays descriptive banner on failure.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Delete Ticket</strong></td>
+            <td>
+              <strong>Observed:</strong> Irreversible operation must prevent accidental data deletion.
+            </td>
+            <td>
+              Prompts confirmation dialog; upon confirmation, calls DELETE and updates UI table reactively.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Customer Module Query</strong></td>
+            <td>
+              <strong>Observed:</strong> If Customer module is not yet created in Corteza, endpoint returns 404.
+            </td>
+            <td>
+              Gracefully activates fallback seed customers, keeping the UI functional without crashing.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="figure-box">
+        <img src="images/corteza-customer-record-view.png" alt="Customer Record Details & Audit" />
+        <div class="figure-caption">
+          <span>Figure 4: Real Identity Preservation & Audit Trail (Owned/Created by Leonid Romanov)</span>
+          <span>Corteza Record View</span>
+        </div>
+      </div>
+
+      <div class="page-footer">
+        <span>Plexys Homework POC</span>
+        <span>Page 3 of 5</span>
+      </div>
+    </section>
+
+    <!-- PAGE 4: USER WORKFLOW & BACKEND SYNC -->
+    <section class="page">
+      <h2>5. User Workflow & Backend Synchronization</h2>
+
+      <p>
+        The Vue 3 interface delivers a seamless support ticket workflow: viewing active metrics, creating tickets with customer associations, editing existing issues, and deleting records safely.
+      </p>
+
+      <div class="two-img-grid">
+        <div class="figure-box">
+          <img src="images/app-create-modal.png" alt="Vue 3 App Create Ticket Modal" />
+          <div class="figure-caption">
+            <span>Figure 5: Vue 3 Create Ticket Dialog</span>
+            <span>Custom Frontend</span>
+          </div>
+        </div>
+        <div class="figure-box">
+          <img src="images/app-edit-modal.png" alt="Vue 3 App Edit Ticket with Customer" />
+          <div class="figure-caption">
+            <span>Figure 6: Edit Dialog with Customer Relation</span>
+            <span>Custom Frontend</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="figure-box">
+        <img src="images/corteza-tickets-records.png" alt="Live Ticket Records with Customer Relation" />
+        <div class="figure-caption">
+          <span>Figure 7: Synchronized Support Ticket Records in Corteza Compose</span>
+          <span>Corteza Backend Records</span>
+        </div>
+      </div>
+
+      <h2>6. Local Deployment & Environment Setup</h2>
+      <pre>
+# 1. Start Docker stack:   docker compose up -d
+# 2. Start Frontend:       cd frontend && npm install && npm run dev</pre>
+
+      <div class="page-footer">
+        <span>Plexys Homework POC</span>
+        <span>Page 4 of 5</span>
+      </div>
+    </section>
+
+    <!-- PAGE 5: LIMITATIONS & NEXT STEPS -->
+    <section class="page">
+      <h2>7. Known Limitations & Future Roadmap</h2>
+
+      <div class="card">
+        <strong>POC Maturity Assessment:</strong> Deliberately scoped to validate core architecture, data modeling, and failure modes within a 5-hour constraint without unnecessary enterprise over-engineering.
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 45%;">Implemented Scope (POC)</th>
+            <th style="width: 55%;">Production Roadmap (Next Steps)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>✅ Full CRUD for Support Tickets</td>
+            <td>→ Server-side pagination using Corteza <code>pageCursor</code> and <code>limit</code></td>
+          </tr>
+          <tr>
+            <td>✅ Customer Cross-Module Relation</td>
+            <td>→ Full Customer management CRUD UI and company filters</td>
+          </tr>
+          <tr>
+            <td>✅ Dynamic OAuth2 Bearer Auth</td>
+            <td>→ Automated PKCE authorization code redirect flow</td>
+          </tr>
+          <tr>
+            <td>✅ Form Validation & Delete Safety</td>
+            <td>→ Optimistic concurrency control via record version hashes</td>
+          </tr>
+          <tr>
+            <td>✅ Responsive UI with PrimeVue</td>
+            <td>→ Automated Playwright E2E and Vitest unit testing suite</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Summary</h3>
+      <p>
+        This POC demonstrates a clean, explainable, and extensible architecture connecting custom Vue 3 applications to Corteza's low-code data and permission engine. All design decisions, failure paths, and cross-module relations are verified and documented.
+      </p>
+
+      <div class="page-footer">
+        <span>Plexys Homework POC</span>
+        <span>Page 5 of 5</span>
+      </div>
+    </section>
+
+  </div>
+
+</body>
+</html>

@@ -1,89 +1,100 @@
-# Plexys Homework
+# Plexys Support Ticket Manager POC
 
-A small POC for a support ticket manager built on top of Corteza with a custom Vue 3 frontend.
+A minimal, production-pattern Proof of Concept (POC) demonstrating a custom **Vue 3** frontend running on top of a **Corteza** low-code backend.
 
-## Vision
+---
 
-This repository demonstrates a realistic enterprise-pattern project in miniature:
-
-- Corteza acts as the backend/data layer
-- Vue 3 provides the custom UI layer
-- the frontend uses the signed-in Corteza user identity
-- ticket records are exposed through a documented API contract
-- the project stays small, clean, and explainable instead of turning into a production platform
-
-## Architecture
+## 🏛️ System Architecture
 
 ```text
-Browser
-  ↓
-Vue 3 app
-  ↓
-Corteza API client / auth session
-  ↓
-Corteza backend
-  ↓
-PostgreSQL
+┌─────────────────────────────────────────────────────────────┐
+│                    Vue 3 SPA (PrimeVue)                     │
+│  ┌──────────────────┐  ┌────────────────┐  ┌─────────────┐  │
+│  │ TicketTable.vue  │  │ TicketModal.vue│  │   App.vue   │  │
+│  └────────┬─────────┘  └───────┬────────┘  └──────┬──────┘  │
+│           └────────────────────┼──────────────────┘         │
+│                                ↓                            │
+│                  useTickets / useCustomers                 │
+│                                ↓                            │
+│                      cortezaService (API)                   │
+└────────────────────────────────┬────────────────────────────┘
+                                 │ HTTP (Bearer JWT / OAuth2)
+                                 ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Corteza Low-Code Backend                    │
+│  - Namespace: "Plexys Homework"                             │
+│  - Modules: "Support Ticket", "Customer" (Record Relation)  │
+│  - RBAC & Audit Engine (Preserving Signed-in User Identity) │
+└────────────────────────────────┬────────────────────────────┘
+                                 │
+                                 ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     PostgreSQL 15                           │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Repo structure
+---
+
+## 📁 Repository Structure
 
 ```text
 .
 ├── docs/
-│   ├── plan.md
-│   └── project-plan.md
+│   ├── poc-architecture-and-review-guide.md   # Complete 6-section architecture & interview review guide
+│   ├── corteza-setup.md                       # Platform run & setup documentation
+│   ├── api-discovery.md                       # API discovery findings and auth behavior
+│   ├── compose-import.json                    # Schema definitions for Support Ticket & Customer
+│   └── ai/                                    # Original assignment requirements and task plan
 ├── frontend/
 │   ├── src/
+│   │   ├── components/
+│   │   │   ├── TicketTable.vue                # Responsive data table with badges & actions
+│   │   │   └── TicketModal.vue                # Form dialog for Create/Edit with validation
+│   │   ├── composables/
+│   │   │   ├── useTickets.ts                  # Centralized ticket state & CRUD actions
+│   │   │   └── useCustomers.ts                # Customer list & relationship lookup
+│   │   ├── services/
+│   │   │   └── corteza.ts                     # API client, dynamic auth & payload mapping
+│   │   ├── types/
+│   │   │   ├── ticket.ts                      # Strict TypeScript definitions for tickets
+│   │   │   └── customer.ts                    # Customer model definitions
+│   │   ├── App.vue                            # Orchestrator with metrics & session modal
+│   │   └── main.ts                            # PrimeVue & theme configuration
 │   ├── index.html
 │   ├── package.json
 │   ├── tsconfig.json
-│   ├── tsconfig.node.json
-│   ├── vite.config.ts
-│   └── ...
-├── .env.example
-├── .gitignore
-├── docker-compose.yml
+│   └── vite.config.ts
+├── docker-compose.yml                         # Corteza 2024.9 + PostgreSQL 15 stack
+├── .env.example                               # Environment template for local runs
 ├── README.md
-└── .idea/ (workspace metadata)
+└── scripts/
+    └── probe_corteza.sh                       # CLI endpoint probing utility
 ```
 
-## Development phases
+---
 
-### Phase 1: platform setup
-- Launch Corteza and Postgres via Docker
-- Document the selected Corteza version and setup notes
-- Configure the Plexys Homework namespace and Support Ticket module
+## 🚀 Quickstart
 
-### Phase 2: API discovery
-- Validate auth flow and current user behavior
-- Inspect module and record endpoints
-- Confirm record payload shape and error behavior
-
-### Phase 3: frontend shell
-- Set up Vue 3 + Vite
-- Define service/composable/type boundaries
-- Scaffold minimal ticket screens
-
-### Phase 4: CRUD and validation
-- List/create/edit/delete support tickets
-- Validate required fields and user feedback
-- Handle failing API states
-
-### Phase 5: documentation and QA
-- Add a README and run instructions
-- Produce the short PDF summary
-- Record known limitations and next steps
-
-## Quickstart
-
-### Local backend
+### 1. Start Corteza & Postgres
 
 ```bash
+cp .env.example .env
 docker compose up -d
 ```
 
-### Frontend
+Verify the stack is healthy:
+```bash
+docker compose ps
+```
+
+### 2. Configure Modules in Corteza UI
+1. Navigate to `http://localhost:18080/` and complete initial admin setup.
+2. In **Compose**, ensure the `Plexys Homework` namespace contains:
+   - **Support Ticket** (`subject`, `description`, `status`, `priority`, `due-date`, `customer`)
+   - **Customer** (`name`, `email`, `company`)
+   *(You can import [docs/compose-import.json](docs/compose-import.json) or configure manually)*.
+
+### 3. Launch Frontend
 
 ```bash
 cd frontend
@@ -91,8 +102,17 @@ npm install
 npm run dev
 ```
 
-## Notes
+Visit the application at **`http://localhost:5173/`**.
 
-- This is a POC and intentionally not a full enterprise stack.
-- The API contract and auth flow must be validated before the UI is built around assumptions.
-- The most important review signal is not “it looks good,” but “the architecture and failure paths are understood and documented.”
+---
+
+## 🔑 Authentication
+
+- **Dynamic Token Resolution**: Supports URL parameters (`?token=...`, `#token=...`), browser `sessionStorage` / `localStorage`, or interactive session modal in the UI.
+- **Audit Trail & RBAC**: Every mutation preserves real user identity extracted from token claims (`sub`), ensuring audit stamps (`createdBy`, `updatedAt`) and Corteza permissions function correctly.
+
+---
+
+## 📖 Comprehensive Review Guide
+
+For a deep dive into technology rationale (*Why Vue 3? Why PrimeVue?*), failure path tracing (*Observed vs Assumed*), and future roadmap, read **[docs/poc-architecture-and-review-guide.md](docs/poc-architecture-and-review-guide.md)**.

@@ -93,25 +93,38 @@ The system demonstrates a production-style pattern in miniature:
 
 ---
 
-## 4. User Guide
+---
+
+## 4. User Guide & Interface
+
+### Application Screenshots
+
+| Create Ticket Modal | Edit Ticket with Customer |
+| :---: | :---: |
+| ![Create Ticket Modal](images/app-create-modal.png) | ![Edit Ticket with Customer](images/app-edit-modal.png) |
+
+| Corteza Modules in Namespace | Synchronized Records in Corteza |
+| :---: | :---: |
+| ![Corteza Modules](images/corteza-modules.png) | ![Synchronized Records](images/corteza-tickets-records.png) |
 
 ### 1. View Support Tickets
 - Navigate to the frontend application (`http://localhost:5173/`).
-- The dashboard displays the total ticket count and count of open tickets (excluding *Resolved* and *Closed*).
-- Tickets are displayed in a responsive data table showing **Subject**, **Status**, **Priority**, and **Due Date**.
+- The dashboard displays the total ticket count, open count, and customer metrics in the header.
+- Tickets are displayed in a responsive data table showing **Subject**, **Customer**, **Status**, **Priority**, and **Due Date**.
 
 ### 2. Create a New Ticket
 1. Click the **"New Ticket"** button in the top right.
 2. Enter the **Subject** (required).
-3. Provide an optional **Description**.
-4. Select the **Status** (`New`, `In Progress`, `Resolved`, `Closed`).
-5. Select the **Priority** (`Low`, `Medium`, `High`, `Urgent`).
-6. Pick an optional **Due Date** using the calendar picker.
-7. Click **"Save"**. The modal closes and the table updates with the newly created ticket.
+3. Select an optional **Customer** from the dropdown list.
+4. Provide an optional **Description**.
+5. Select the **Status** (`New`, `In Progress`, `Resolved`, `Closed`).
+6. Select the **Priority** (`Low`, `Medium`, `High`, `Urgent`).
+7. Pick an optional **Due Date** using the calendar picker.
+8. Click **"Save"**. The modal closes and the table updates with the newly created ticket.
 
 ### 3. Edit an Existing Ticket
 1. Click the **"Edit"** button on any table row.
-2. The modal opens pre-populated with existing values.
+2. The modal opens pre-populated with existing values (including assigned Customer).
 3. Make the necessary changes and click **"Save"**.
 
 ### 4. Delete a Ticket
