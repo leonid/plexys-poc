@@ -1,11 +1,17 @@
 import type { TicketDateValue, TicketRecord } from '../types/ticket'
 
 const API_BASE = (import.meta.env.VITE_CORTEZA_API_URL || 'http://localhost:18080').replace(/\/$/, '')
+const NAMESPACE_ID = (import.meta.env.VITE_CORTEZA_NAMESPACE_ID || '')
 const MODULE_ID = (import.meta.env.VITE_CORTEZA_MODULE_ID || '')
 
-export interface CortezaListResponse {
-  data: TicketRecord[]
-  meta?: { total?: number }
+function ensureNamespaceAndModule() {
+  if (!NAMESPACE_ID) throw new Error('VITE_CORTEZA_NAMESPACE_ID is not set')
+  if (!MODULE_ID) throw new Error('VITE_CORTEZA_MODULE_ID is not set')
+}
+
+function composeBasePath() {
+  ensureNamespaceAndModule()
+  return `/compose/namespace/${NAMESPACE_ID}/module/${MODULE_ID}`
 }
 
 function normalizeDueDate(value: TicketDateValue | Date | null): string | null {
@@ -28,8 +34,7 @@ function getHeaders() {
 }
 
 function toTicketRecord(input: any): TicketRecord {
-  // Normalize different possible shapes returned by Corteza
-  const payload = input?.record || input?.data || input || {}
+  const payload = input?.record || input || {}
   const values = payload?.values || payload
 
   return {
@@ -62,38 +67,20 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return text ? (JSON.parse(text) as T) : ({} as T)
 }
 
-async function tryEndpointsForList(candidates: string[]) {
-  let lastErr: any = null
-  for (const p of candidates) {
-    try {
-      const res = await request<any>(p)
-      if (Array.isArray(res) || res?.data) return res
-    } catch (err) {
-      lastErr = err
-    }
-  }
-  throw lastErr || new Error('No working list endpoint found')
-}
-
 export const cortezaService = {
   async listTickets(): Promise<TicketRecord[]> {
-    if (!MODULE_ID) throw new Error('VITE_CORTEZA_MODULE_ID is not set')
-
-    const candidates = [
-      `/api/records?module=${MODULE_ID}`,
-      `/api/compose/records?module=${MODULE_ID}`,
-      `/api/module/records?module=${MODULE_ID}`,
-      `/api/records?moduleName=${encodeURIComponent('Support Ticket')}`
-    ]
-
-    const payload = await tryEndpointsForList(candidates)
-    const rows = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : payload?.data || []
+    ensureNamespaceAndModule()
+    const path = `${composeBasePath()}/record`
+    const res = await request<any>(path)
+    // Corteza may return { data: [...] } or an array
+    const rows = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : res?.data || []
     return rows.map(toTicketRecord)
   },
 
   async createTicket(payload: Partial<TicketRecord>): Promise<TicketRecord> {
-    if (!MODULE_ID) throw new Error('VITE_CORTEZA_MODULE_ID is not set')
-    const normalizedPayload = {
+    ensureNamespaceAndModule()
+    const path = `${composeBasePath()}/record`
+    const body = JSON.stringify({
       record: {
         moduleID: MODULE_ID,
         values: {
@@ -104,31 +91,16 @@ export const cortezaService = {
           dueDate: normalizeDueDate(payload.dueDate ?? null)
         }
       }
-    }
+    })
 
-    const candidates = [
-      `/api/records`,
-      `/api/compose/records`,
-      `/api/records?module=${MODULE_ID}`
-    ]
-
-    let lastErr: any = null
-    for (const p of candidates) {
-      try {
-        const resp = await request<any>(p, {
-          method: 'POST',
-          body: JSON.stringify(normalizedPayload)
-        })
-        return toTicketRecord(resp?.record || resp)
-      } catch (err) {
-        lastErr = err
-      }
-    }
-    throw lastErr || new Error('Create failed for all candidate endpoints')
+    const resp = await request<any>(path, { method: 'POST', body })
+    return toTicketRecord(resp?.record || resp)
   },
 
   async updateTicket(id: string, payload: Partial<TicketRecord>): Promise<TicketRecord> {
-    const normalizedPayload = {
+    ensureNamespaceAndModule()
+    const path = `${composeBasePath()}/record/${id}`
+    const body = JSON.stringify({
       record: {
         moduleID: MODULE_ID,
         recordID: id,
@@ -140,39 +112,15 @@ export const cortezaService = {
           dueDate: normalizeDueDate(payload.dueDate ?? null)
         }
       }
-    }
+    })
 
-    const candidates = [
-      `/api/records/${id}`,
-      `/api/compose/records/${id}`
-    ]
-
-    let lastErr: any = null
-    for (const p of candidates) {
-      try {
-        const resp = await request<any>(p, {
-          method: 'PATCH',
-          body: JSON.stringify(normalizedPayload)
-        })
-        return toTicketRecord(resp?.record || resp)
-      } catch (err) {
-        lastErr = err
-      }
-    }
-    throw lastErr || new Error('Update failed for all candidate endpoints')
+    const resp = await request<any>(path, { method: 'PATCH', body })
+    return toTicketRecord(resp?.record || resp)
   },
 
   async deleteTicket(id: string): Promise<void> {
-    const candidates = [`/api/records/${id}`, `/api/compose/records/${id}`]
-    let lastErr: any = null
-    for (const p of candidates) {
-      try {
-        await request<any>(p, { method: 'DELETE' })
-        return
-      } catch (err) {
-        lastErr = err
-      }
-    }
-    throw lastErr || new Error('Delete failed for all candidate endpoints')
+    ensureNamespaceAndModule()
+    const path = `${composeBasePath()}/record/${id}`
+    await request<any>(path, { method: 'DELETE' })
   }
 }
