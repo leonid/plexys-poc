@@ -5,6 +5,20 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     port: 5173,
-    host: '0.0.0.0'
+    host: '0.0.0.0',
+    proxy: {
+      '/api': {
+        target: process.env.VITE_CORTEZA_API_URL || 'http://127.0.0.1:18080',
+        changeOrigin: true
+      },
+      '/compose': {
+        target: process.env.VITE_CORTEZA_API_URL || 'http://127.0.0.1:18080',
+        changeOrigin: true
+      },
+      '/auth': {
+        target: process.env.VITE_CORTEZA_API_URL || 'http://127.0.0.1:18080',
+        changeOrigin: true
+      }
+    }
   }
 })

@@ -21,13 +21,75 @@ function normalizeDueDate(value: TicketDateValue | Date | null): string | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
 }
 
-function getHeaders() {
-  const csrfToken = document.cookie
-    .split('; ')
-    .find((row) => row.startsWith('CortezaCSRF='))
-    ?.split('=')[1]
+const TOKEN_STORAGE_KEY = 'corteza_auth_token'
 
-  const jwt = (import.meta.env.VITE_CORTEZA_JWT as string) || ''
+export function getAuthToken(): string {
+  if (typeof window !== 'undefined') {
+    try {
+      const url = new URL(window.location.href)
+      const tokenFromQuery = url.searchParams.get('token') || url.searchParams.get('access_token')
+      if (tokenFromQuery) {
+        sessionStorage.setItem(TOKEN_STORAGE_KEY, tokenFromQuery)
+        url.searchParams.delete('token')
+        url.searchParams.delete('access_token')
+        window.history.replaceState({}, document.title, url.pathname + url.search)
+        return tokenFromQuery
+      }
+
+      if (window.location.hash) {
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#\/?/, ''))
+        const tokenFromHash = hashParams.get('access_token') || hashParams.get('token')
+        if (tokenFromHash) {
+          sessionStorage.setItem(TOKEN_STORAGE_KEY, tokenFromHash)
+          window.location.hash = ''
+          return tokenFromHash
+        }
+      }
+
+      const sessionToken = sessionStorage.getItem(TOKEN_STORAGE_KEY)
+      if (sessionToken) return sessionToken
+
+      const localToken = localStorage.getItem(TOKEN_STORAGE_KEY)
+      if (localToken) return localToken
+    } catch {
+      // Storage access may fail in sandboxed iframes
+    }
+  }
+
+  return (import.meta.env.VITE_CORTEZA_JWT as string) || ''
+}
+
+export function setAuthToken(token: string, persist = true): void {
+  if (typeof window !== 'undefined') {
+    try {
+      if (token.trim()) {
+        sessionStorage.setItem(TOKEN_STORAGE_KEY, token.trim())
+        if (persist) {
+          localStorage.setItem(TOKEN_STORAGE_KEY, token.trim())
+        }
+      } else {
+        sessionStorage.removeItem(TOKEN_STORAGE_KEY)
+        localStorage.removeItem(TOKEN_STORAGE_KEY)
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }
+}
+
+export function clearAuthToken(): void {
+  setAuthToken('', false)
+}
+
+function getHeaders() {
+  const csrfToken = typeof document !== 'undefined'
+    ? document.cookie
+        .split('; ')
+        .find((row) => row.startsWith('CortezaCSRF='))
+        ?.split('=')[1]
+    : undefined
+
+  const jwt = getAuthToken()
 
   return {
     Accept: 'application/json, text/plain, */*',
@@ -90,8 +152,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   const contentType = response.headers.get('content-type') || ''
   if (contentType.includes('text/html')) {
-    const html = await response.text()
-    throw new Error('Unexpected HTML response (likely an auth redirect). Ensure you are authenticated via cookie/session or provide a JWT in VITE_CORTEZA_JWT.');
+    throw new Error('Corteza returned an authentication redirect or HTML error. Please ensure a valid OAuth Bearer JWT is provided via session or environment.');
   }
 
   if (!response.ok) {
@@ -108,6 +169,34 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 }
 
+export function getJwtUserId(): string | null {
+  const jwt = getAuthToken()
+  if (!jwt) return null
+  try {
+    const parts = jwt.split('.')
+    if (parts.length < 2) return null
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const decoded = atob(base64)
+    const payload = JSON.parse(decoded)
+    return payload.sub || null
+  } catch {
+    return null
+  }
+}
+
+function buildRecordValues(payload: Partial<TicketRecord>) {
+  return [
+    { name: 'subject', value: payload.subject ?? '' },
+    { name: 'description', value: payload.description ?? '' },
+    { name: 'status', value: payload.status ?? 'New' },
+    { name: 'priority', value: payload.priority ?? 'Medium' },
+    {
+      name: 'due-date',
+      value: normalizeDueDate(payload.dueDate ?? null)
+    }
+  ]
+}
+
 export const cortezaService = {
   async listTickets(): Promise<TicketRecord[]> {
     ensureNamespaceAndModule()
@@ -119,7 +208,7 @@ export const cortezaService = {
     let lastErr: any = null
     for (const path of paths) {
       try {
-            const res = await request<any>(path)
+        const res = await request<any>(path)
         // some Corteza Compose responses wrap records under response.set
         const rows = res?.response?.set || res?.data || (Array.isArray(res) ? res : null) || res?.set || []
         return (Array.isArray(rows) ? rows : []).map(toTicketRecord)
@@ -132,32 +221,24 @@ export const cortezaService = {
 
   async createTicket(payload: Partial<TicketRecord>): Promise<TicketRecord> {
     ensureNamespaceAndModule()
-    const paths = [
-      `${composeBasePath()}/record/`,
-      `/api${composeBasePath()}/record/`
-    ]
-
-    const body = JSON.stringify({
+    const currentUserId = getJwtUserId()
+    const recordPayload: Record<string, any> = {
       meta: {},
-      ownedBy: "514163239218708481",
-      values: [
-        { name: 'subject', value: payload.subject ?? '' },
-        { name: 'description', value: payload.description ?? '' },
-        { name: 'status', value: payload.status ?? 'New' },
-        { name: 'priority', value: payload.priority ?? 'Medium' },
-        {
-          name: 'due-date',
-          value: normalizeDueDate(payload.dueDate ?? null),
-        },
-      ],
-    })
+      values: buildRecordValues(payload)
+    }
+
+    if (currentUserId) {
+      recordPayload.ownedBy = currentUserId
+    }
+
+    const body = JSON.stringify(recordPayload)
 
     const resp = await request<any>(
-        `/api${composeBasePath()}/record/`,
-        {
-          method: 'POST',
-          body,
-        }
+      `/api${composeBasePath()}/record/`,
+      {
+        method: 'POST',
+        body
+      }
     )
 
     return toTicketRecord(resp?.record || resp)
@@ -171,29 +252,28 @@ export const cortezaService = {
     ]
 
     const body = JSON.stringify({
-      record: {
-        moduleID: MODULE_ID,
-        recordID: id,
-        values: {
+
+        // moduleID: MODULE_ID,
+        // recordID: id,
+      query: `recordID = ${id}`,
+        values: buildRecordValues({
           subject: payload.subject,
           description: payload.description,
           status: payload.status,
           priority: payload.priority,
           dueDate: normalizeDueDate(payload.dueDate ?? null)
-        }
-      }
+        })
     })
 
-    let lastErr: any = null
-    for (const path of paths) {
-      try {
-        const resp = await request<any>(path, { method: 'PATCH', body })
-        return toTicketRecord(resp?.record || resp)
-      } catch (err) {
-        lastErr = err
+    const resp = await request<any>(
+      `/api${composeBasePath()}/record/`,
+      {
+        method: 'PATCH',
+        body
       }
-    }
-    throw lastErr || new Error('Update failed for all candidate endpoints')
+    )
+
+    return toTicketRecord(resp?.record || resp)
   },
 
   async deleteTicket(id: string): Promise<void> {
