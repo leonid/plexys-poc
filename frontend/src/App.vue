@@ -8,21 +8,28 @@ import { useConfirm } from 'primevue/useconfirm'
 import TicketTable from './components/TicketTable.vue'
 import TicketModal from './components/TicketModal.vue'
 import { useTickets } from './composables/useTickets'
+import { useCustomers } from './composables/useCustomers'
 import { clearAuthToken, getAuthToken, getJwtUserId, setAuthToken } from './services/corteza'
 import type { TicketFormValues, TicketRecord } from './types/ticket'
 
 const {
   tickets,
-  loading,
-  error,
+  loading: ticketsLoading,
+  error: ticketsError,
   statusOptions,
   priorityOptions,
   ticketSummary,
-  load,
+  load: loadTickets,
   create,
   update,
   remove
 } = useTickets()
+
+const {
+  customers,
+  customerOptions,
+  loadCustomers
+} = useCustomers()
 
 const confirm = useConfirm()
 
@@ -45,11 +52,15 @@ function openAuthDialog() {
   isAuthDialogOpen.value = true
 }
 
+async function refreshAll() {
+  await Promise.all([loadTickets(), loadCustomers()])
+}
+
 function saveToken() {
   setAuthToken(authTokenInput.value.trim(), true)
   refreshAuth()
   isAuthDialogOpen.value = false
-  load()
+  refreshAll()
 }
 
 function handleLogout() {
@@ -57,7 +68,7 @@ function handleLogout() {
   authTokenInput.value = ''
   refreshAuth()
   isAuthDialogOpen.value = false
-  load()
+  refreshAll()
 }
 
 function openCreateDialog() {
@@ -78,7 +89,7 @@ async function handleSave(values: TicketFormValues) {
   }
   isModalVisible.value = false
   editingTicket.value = null
-  await load()
+  await loadTickets()
 }
 
 function handleDelete(ticket: TicketRecord) {
@@ -91,14 +102,14 @@ function handleDelete(ticket: TicketRecord) {
     acceptClass: 'p-button-danger',
     accept: async () => {
       await remove(ticket.id || '')
-      await load()
+      await loadTickets()
     }
   })
 }
 
 onMounted(() => {
   refreshAuth()
-  load()
+  refreshAll()
 })
 </script>
 
@@ -109,7 +120,7 @@ onMounted(() => {
     <header class="header">
       <div>
         <h1>Support Tickets</h1>
-        <p>{{ ticketSummary.total }} total · {{ ticketSummary.open }} open</p>
+        <p>{{ ticketSummary.total }} total · {{ ticketSummary.open }} open · {{ customers.length }} customers</p>
       </div>
       <div class="header-actions">
         <Button
@@ -125,19 +136,19 @@ onMounted(() => {
           severity="secondary"
           text
           rounded
-          aria-label="Refresh tickets"
-          :loading="loading"
-          @click="load"
+          aria-label="Refresh data"
+          :loading="ticketsLoading"
+          @click="refreshAll"
         />
         <Button label="New Ticket" icon="pi pi-plus" @click="openCreateDialog" />
       </div>
     </header>
 
     <section class="table-card">
-      <div v-if="error" class="error-banner">
+      <div v-if="ticketsError" class="error-banner">
         <i class="pi pi-exclamation-circle"></i>
         <div class="error-content">
-          <span>{{ error }}</span>
+          <span>{{ ticketsError }}</span>
           <Button
             v-if="!isAuthed"
             label="Provide Auth Token"
@@ -151,7 +162,8 @@ onMounted(() => {
 
       <TicketTable
         :tickets="tickets"
-        :loading="loading"
+        :customers="customers"
+        :loading="ticketsLoading"
         @edit="openEditDialog"
         @delete="handleDelete"
       />
@@ -162,6 +174,7 @@ onMounted(() => {
       :ticket="editingTicket"
       :status-options="statusOptions"
       :priority-options="priorityOptions"
+      :customer-options="customerOptions"
       @save="handleSave"
     />
 

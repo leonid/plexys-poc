@@ -2,13 +2,14 @@ import { ref, computed } from 'vue'
 import { cortezaService } from '../services/corteza'
 import type { TicketFormValues, TicketRecord } from '../types/ticket'
 
-function normalizeFormPayload(values: TicketFormValues) {
+function normalizeFormPayload(values: TicketFormValues): Partial<TicketRecord> {
   return {
     subject: values.subject,
     description: values.description,
     status: values.status,
     priority: values.priority,
-    dueDate: values.dueDate ? values.dueDate.toISOString() : null
+    dueDate: values.dueDate ? values.dueDate.toISOString() : null,
+    customerId: values.customerId ?? null
   }
 }
 

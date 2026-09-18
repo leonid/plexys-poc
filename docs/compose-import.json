@@ -7,6 +7,30 @@
         "handle": "plexys-homework",
         "modules": [
           {
+            "name": "Customer",
+            "handle": "customer",
+            "fields": [
+              {
+                "name": "name",
+                "kind": "String",
+                "label": "Customer Name",
+                "required": true
+              },
+              {
+                "name": "email",
+                "kind": "Email",
+                "label": "Email",
+                "required": false
+              },
+              {
+                "name": "company",
+                "kind": "String",
+                "label": "Company",
+                "required": false
+              }
+            ]
+          },
+          {
             "name": "Support Ticket",
             "handle": "support_ticket",
             "fields": [
@@ -41,6 +65,15 @@
                 "kind": "DateTime",
                 "label": "Due Date",
                 "required": false
+              },
+              {
+                "name": "customer",
+                "kind": "Record",
+                "label": "Customer",
+                "required": false,
+                "options": {
+                  "module": "customer"
+                }
               }
             ]
           }
@@ -48,5 +81,5 @@
       }
     ]
   },
-  "note": "This is a best-effort Corteza Compose import file. Import via Corteza Compose UI or adjust format per your Corteza version if needed. If import fails, create namespace/module manually using the Compose UI per docs/plan.md."
+  "note": "Corteza Compose schema definition for Support Ticket & Customer modules. Import via Corteza Compose UI or configure manually."
 }

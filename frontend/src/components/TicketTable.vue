@@ -3,9 +3,11 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import type { TicketRecord } from '../types/ticket'
+import type { CustomerRecord } from '../types/customer'
 
-defineProps<{
+const props = defineProps<{
   tickets: TicketRecord[]
+  customers?: CustomerRecord[]
   loading: boolean
 }>()
 
@@ -19,6 +21,14 @@ function formatDate(dateValue: string | null | undefined): string {
   const d = new Date(dateValue)
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString()
 }
+
+function resolveCustomer(ticket: TicketRecord): string {
+  if (ticket.customerName) return ticket.customerName
+  if (!ticket.customerId) return '—'
+  const found = props.customers?.find((c) => c.id === ticket.customerId)
+  if (!found) return ticket.customerId
+  return found.company ? `${found.name} (${found.company})` : found.name
+}
 </script>
 
 <template>
@@ -28,6 +38,15 @@ function formatDate(dateValue: string | null | undefined): string {
     </template>
 
     <Column field="subject" header="Subject" />
+    <Column header="Customer">
+      <template #body="slotProps">
+        <span v-if="slotProps.data.customerId || slotProps.data.customerName" class="customer-badge">
+          <i class="pi pi-building"></i>
+          {{ resolveCustomer(slotProps.data) }}
+        </span>
+        <span v-else class="unassigned-text">—</span>
+      </template>
+    </Column>
     <Column field="status" header="Status">
       <template #body="slotProps">
         <span class="status-badge" :data-status="slotProps.data.status">
@@ -80,6 +99,27 @@ function formatDate(dateValue: string | null | undefined): string {
   text-align: center;
   padding: 24px;
   color: #64748b;
+}
+
+.customer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: #f8fafc;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+}
+
+.customer-badge i {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.unassigned-text {
+  color: #94a3b8;
 }
 
 .status-badge,

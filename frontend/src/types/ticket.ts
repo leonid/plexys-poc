@@ -9,6 +9,8 @@ export interface TicketRecord {
   status: TicketStatus
   priority: TicketPriority
   dueDate?: TicketDateValue
+  customerId?: string | null
+  customerName?: string
   createdAt?: string
   updatedAt?: string
   owner?: string
@@ -20,4 +22,5 @@ export interface TicketFormValues {
   status: TicketStatus
   priority: TicketPriority
   dueDate: Date | null
+  customerId?: string | null
 }

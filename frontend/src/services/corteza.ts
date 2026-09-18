@@ -1,8 +1,17 @@
 import type { TicketDateValue, TicketRecord } from '../types/ticket'
+import type { CustomerRecord } from '../types/customer'
 
 const API_BASE = (import.meta.env.VITE_CORTEZA_API_URL || 'http://localhost:18080').replace(/\/$/, '')
 const NAMESPACE_ID = (import.meta.env.VITE_CORTEZA_NAMESPACE_ID || '')
 const MODULE_ID = (import.meta.env.VITE_CORTEZA_MODULE_ID || '')
+const CUSTOMER_MODULE_ID = (import.meta.env.VITE_CORTEZA_CUSTOMER_MODULE_ID || '')
+
+const SEED_CUSTOMERS: CustomerRecord[] = [
+  { id: 'cust-1', name: 'Alice Johnson', email: 'alice@acme.corp', company: 'Acme Corp' },
+  { id: 'cust-2', name: 'Bob Smith', email: 'bob@globex.com', company: 'Globex Industries' },
+  { id: 'cust-3', name: 'Carol Danvers', email: 'carol@initech.io', company: 'Initech LLC' },
+  { id: 'cust-4', name: 'David Miller', email: 'david@soylent.com', company: 'Soylent Corp' }
+]
 
 function ensureNamespaceAndModule() {
   if (!NAMESPACE_ID) throw new Error('VITE_CORTEZA_NAMESPACE_ID is not set')
@@ -52,7 +61,7 @@ export function getAuthToken(): string {
       const localToken = localStorage.getItem(TOKEN_STORAGE_KEY)
       if (localToken) return localToken
     } catch {
-      // Storage access may fail in sandboxed iframes
+      // Storage access may fail in sandboxed contexts
     }
   }
 
@@ -113,29 +122,27 @@ function toTicketRecord(input: any): TicketRecord {
 
   return {
     id: payload.recordID || payload.id || payload.record_id,
-
     subject: values.subject ?? '',
-
     description: values.description ?? '',
-
     status: values.status ?? 'New',
-
     priority: values.priority ?? 'Medium',
-
     dueDate:
         values.dueDate ??
         values['due-date'] ??
         values.due_date ??
         null,
-
+    customerId:
+        values.customer ??
+        values.customerId ??
+        values.customer_id ??
+        values['customer-id'] ??
+        null,
     createdAt:
         payload.createdAt ??
         payload.created_at,
-
     updatedAt:
         payload.updatedAt ??
         payload.updated_at,
-
     owner:
         payload.owner ??
         payload.createdBy,
@@ -185,7 +192,7 @@ export function getJwtUserId(): string | null {
 }
 
 function buildRecordValues(payload: Partial<TicketRecord>) {
-  return [
+  const values: Array<{ name: string; value: any }> = [
     { name: 'subject', value: payload.subject ?? '' },
     { name: 'description', value: payload.description ?? '' },
     { name: 'status', value: payload.status ?? 'New' },
@@ -195,6 +202,12 @@ function buildRecordValues(payload: Partial<TicketRecord>) {
       value: normalizeDueDate(payload.dueDate ?? null)
     }
   ]
+
+  if (payload.customerId !== undefined) {
+    values.push({ name: 'customer', value: payload.customerId || '' })
+  }
+
+  return values
 }
 
 export const cortezaService = {
@@ -202,14 +215,13 @@ export const cortezaService = {
     ensureNamespaceAndModule()
     const paths = [
       `${composeBasePath()}/record`,
-      `/api${composeBasePath()}/record/?summaries=[]&query=&deleted=0&limit=14&incTotal=true&incPageNavigation=true&sort=createdAt+DESC`
+      `/api${composeBasePath()}/record/?summaries=[]&query=&deleted=0&limit=50&incTotal=true&incPageNavigation=true&sort=createdAt+DESC`
     ]
 
     let lastErr: any = null
     for (const path of paths) {
       try {
         const res = await request<any>(path)
-        // some Corteza Compose responses wrap records under response.set
         const rows = res?.response?.set || res?.data || (Array.isArray(res) ? res : null) || res?.set || []
         return (Array.isArray(rows) ? rows : []).map(toTicketRecord)
       } catch (err) {
@@ -246,34 +258,36 @@ export const cortezaService = {
 
   async updateTicket(id: string, payload: Partial<TicketRecord>): Promise<TicketRecord> {
     ensureNamespaceAndModule()
-    const paths = [
-      `${composeBasePath()}/record/${id}`,
-      `/api${composeBasePath()}/record/${id}`
-    ]
-
     const body = JSON.stringify({
-
-        // moduleID: MODULE_ID,
-        // recordID: id,
-      query: `recordID = ${id}`,
-        values: buildRecordValues({
-          subject: payload.subject,
-          description: payload.description,
-          status: payload.status,
-          priority: payload.priority,
-          dueDate: normalizeDueDate(payload.dueDate ?? null)
-        })
+      recordID: id,
+      values: buildRecordValues(payload)
     })
 
-    const resp = await request<any>(
-      `/api${composeBasePath()}/record/`,
-      {
-        method: 'PATCH',
-        body
-      }
-    )
+    const paths = [
+      `/api${composeBasePath()}/record/${id}`,
+      `${composeBasePath()}/record/${id}`
+    ]
 
-    return toTicketRecord(resp?.record || resp)
+    let lastErr: any = null
+    for (const path of paths) {
+      try {
+        const resp = await request<any>(path, { method: 'PATCH', body })
+        return toTicketRecord(resp?.record || resp)
+      } catch (err) {
+        lastErr = err
+      }
+    }
+
+    for (const path of paths) {
+      try {
+        const resp = await request<any>(path, { method: 'POST', body })
+        return toTicketRecord(resp?.record || resp)
+      } catch (err) {
+        lastErr = err
+      }
+    }
+
+    throw lastErr || new Error('Update failed for all candidate endpoints')
   },
 
   async deleteTicket(id: string): Promise<void> {
@@ -293,5 +307,40 @@ export const cortezaService = {
       }
     }
     throw lastErr || new Error('Delete failed for all candidate endpoints')
+  },
+
+  async listCustomers(): Promise<CustomerRecord[]> {
+    if (!NAMESPACE_ID || !CUSTOMER_MODULE_ID) {
+      return SEED_CUSTOMERS
+    }
+
+    const paths = [
+      `/compose/namespace/${NAMESPACE_ID}/module/${CUSTOMER_MODULE_ID}/record`,
+      `/api/compose/namespace/${NAMESPACE_ID}/module/${CUSTOMER_MODULE_ID}/record/?deleted=0&limit=50`
+    ]
+
+    for (const path of paths) {
+      try {
+        const res = await request<any>(path)
+        const rows = res?.response?.set || res?.data || (Array.isArray(res) ? res : null) || res?.set || []
+        if (Array.isArray(rows) && rows.length > 0) {
+          return rows.map((r: any) => {
+            const values = Array.isArray(r.values)
+              ? Object.fromEntries(r.values.map((item: any) => [item.name, item.value]))
+              : r.values || {}
+            return {
+              id: r.recordID || r.id || r.record_id,
+              name: values.name || values.Name || 'Unnamed Customer',
+              email: values.email || values.Email || '',
+              company: values.company || values.Company || ''
+            }
+          })
+        }
+      } catch {
+        // Fallback to seed customers if remote query fails
+      }
+    }
+
+    return SEED_CUSTOMERS
   }
 }

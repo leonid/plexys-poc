@@ -13,6 +13,7 @@ const props = defineProps<{
   ticket: TicketRecord | null
   statusOptions: string[]
   priorityOptions: string[]
+  customerOptions?: { label: string; value: string }[]
 }>()
 
 const emit = defineEmits<{
@@ -25,7 +26,8 @@ const formValues = ref<TicketFormValues>({
   description: '',
   status: 'New',
   priority: 'Medium',
-  dueDate: null
+  dueDate: null,
+  customerId: ''
 })
 
 const subjectError = ref('')
@@ -47,7 +49,8 @@ function syncForm() {
       description: props.ticket.description || '',
       status: props.ticket.status || 'New',
       priority: props.ticket.priority || 'Medium',
-      dueDate: parseDateInput(props.ticket.dueDate ?? null)
+      dueDate: parseDateInput(props.ticket.dueDate ?? null),
+      customerId: props.ticket.customerId || ''
     }
   } else {
     formValues.value = {
@@ -55,7 +58,8 @@ function syncForm() {
       description: '',
       status: 'New',
       priority: 'Medium',
-      dueDate: null
+      dueDate: null,
+      customerId: ''
     }
   }
 }
@@ -88,7 +92,7 @@ function handleSubmit() {
     :visible="visible"
     :header="title"
     modal
-    :style="{ width: '520px' }"
+    :style="{ width: '540px' }"
     @update:visible="emit('update:visible', $event)"
   >
     <form class="form-grid" @submit.prevent="handleSubmit">
@@ -106,13 +110,27 @@ function handleSubmit() {
       </div>
 
       <div class="field">
+        <label for="customer">
+          <span>Customer (Optional)</span>
+        </label>
+        <Select
+          id="customer"
+          v-model="formValues.customerId"
+          :options="customerOptions || []"
+          option-label="label"
+          option-value="value"
+          placeholder="Select customer"
+        />
+      </div>
+
+      <div class="field">
         <label for="description">
           <span>Description</span>
         </label>
         <Textarea
           id="description"
           v-model="formValues.description"
-          rows="4"
+          rows="3"
           auto-resize
           placeholder="Additional context or details"
         />
@@ -154,7 +172,7 @@ function handleSubmit() {
 <style scoped>
 .form-grid {
   display: grid;
-  gap: 16px;
+  gap: 14px;
   padding-top: 8px;
 }
 
